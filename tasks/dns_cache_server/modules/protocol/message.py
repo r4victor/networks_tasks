@@ -229,14 +229,15 @@ class QEntry:
 
 
 class ResourceRecord:
-    def __init__(self, name_len, name, type_, class_, ttl, rdata_len, rdata):
+    def __init__(self, name_len, name, type_, class_, ttl, rdata_len, rdata, decompressed_rdata):
         self.name_len = name_len
-        self.rdata_len = rdata_len
         self.name = name
         self.type = type_
         self.class_ = class_
         self.ttl = ttl
+        self.rdata_len = rdata_len
         self.rdata = rdata
+        self.decompressed_rdata = decompressed_rdata
 
     def __len__(self):
         return self.name_len + 10 + self.rdata_len
@@ -251,6 +252,7 @@ class ResourceRecord:
             bytes_[type_start:data_start]
         )
         rdata = bytes_[data_start:data_start+rdata_len]
+        decompressed_rdata = decompress_rdata(type_, bytes_, data_start, rdata_len)
         return cls(
             name_len=name_len,
             name=name,
@@ -258,7 +260,8 @@ class ResourceRecord:
             class_=class_,
             ttl=ttl,
             rdata_len=rdata_len,
-            rdata=rdata
+            rdata=rdata,
+            decompressed_rdata=decompressed_rdata
         )
 
     def to_bytes(self):
@@ -267,9 +270,24 @@ class ResourceRecord:
             self.type +
             self.class_ +
             utils.int_to_bytes(self.ttl, 4) +
-            utils.int_to_bytes(self.rdata_len, 2) +
-            self.rdata
+            utils.int_to_bytes(len(self.decompressed_rdata), 2) +
+            self.decompressed_rdata
         )
+
+
+def decompress_rdata(type_, bytes_, start, rdata_len):
+    type_val = utils.int_from_bytes(type_)
+
+    if type_val in {2, 5, 12}:
+        return encode_name(read_name(bytes_, start)[0])
+    elif type_val == 15:
+        return bytes_[start:start+2] + encode_name(read_name(bytes_, start+2)[0])
+    elif type_val == 6:
+        mname, mname_len = read_name(bytes_, start)
+        rname, rname_len = read_name(bytes_, start+mname_len)
+        fix_start = start + mname_len + rname_len
+        return encode_name(mname) + encode_name(rname) + bytes_[fix_start:fix_start+20]
+    return bytes_[start: start+rdata_len]
 
 
 def read_name(bytes_, start):
@@ -296,7 +314,7 @@ def read_labels(bytes_, start):
             bytes_read += label_len
         else:
             bytes_read += 2
-            pointer = utils.int_from_bytes(bytes_[curr:curr+2]) & (2^14 - 1)
+            pointer = utils.int_from_bytes(bytes_[curr:curr+2]) & (2**14 - 1)
             pointer_labels, _ = read_labels(bytes_, pointer)
             labels.extend(pointer_labels)
             break
