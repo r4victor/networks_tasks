@@ -69,6 +69,8 @@ class ProxyServer:
             return response
         header_fields = '<br>'.join(f'{k}: {v}'for k, v in response['header_fields'].items())
         i = response['body'].find(b'</body>')
+        if i = -1:
+            return response
         response['body'] = response['body'][:i] + header_fields.encode() + response['body'][i:]
         response['header_fields']['Content-Length'] = str((len(response['body'])))
         return response
