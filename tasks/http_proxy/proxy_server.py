@@ -13,6 +13,7 @@ class ProxyServer:
     def start(self):
         self.sock.bind((self.host, self.port))
         self.sock.listen()
+        print('Listening on 80 port...')
         self.listen()
     
     def listen(self):
@@ -67,7 +68,7 @@ class ProxyServer:
         if 'body' not in response:
             return response
         header_fields = '<br>'.join(f'{k}: {v}'for k, v in response['header_fields'].items())
-        i = response['body'].find(b'<body>') + 6
+        i = response['body'].find(b'</body>')
         response['body'] = response['body'][:i] + header_fields.encode() + response['body'][i:]
         response['header_fields']['Content-Length'] = str((len(response['body'])))
         return response

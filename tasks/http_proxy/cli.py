@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from proxy_server import ProxyServer
 
 def main():
